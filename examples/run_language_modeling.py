@@ -212,6 +212,7 @@ def mask_tokens(inputs: torch.Tensor, tokenizer: PreTrainedTokenizer, args) -> T
 
 def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedTokenizer) -> Tuple[int, float]:
     """ Train the model """
+    tokenizer.do_lower_case = False
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter()
 

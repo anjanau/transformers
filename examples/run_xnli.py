@@ -78,6 +78,7 @@ def set_seed(args):
 
 def train(args, train_dataset, model, tokenizer):
     """ Train the model """
+    tokenizer.do_lower_case = False
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter()
 
@@ -302,9 +303,13 @@ def evaluate(args, model, tokenizer, prefix=""):
         eval_loss = eval_loss / nb_eval_steps
         if args.output_mode == "classification":
             preds = np.argmax(preds, axis=1)
+            print(preds)
         else:
             raise ValueError("No other `output_mode` for XNLI.")
         result = compute_metrics(eval_task, preds, out_label_ids)
+        print(eval_dataset)
+        print("predictions:", preds)
+        print("output label ids:", out_label_ids)
         results.update(result)
 
         output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
