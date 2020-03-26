@@ -112,7 +112,7 @@ setup(
         # for XLNet
         "sentencepiece",
         # for XLM
-        "sacremoses",
+        "sacremoses", 'pandas'
     ],
     extras_require=extras,
     scripts=["transformers-cli"],
