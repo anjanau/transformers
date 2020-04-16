@@ -380,7 +380,7 @@ def eval_train_or_test(args, model, tokenizer, prefix="", eval=True, epoch=None)
                 tsv_writer = csv.writer(out_file, delimiter='\t')
                 tsv_writer.writerows([["prediction", "label"]] + preds_labels)
 
-    return eval_loss
+    return results
 
 
 def load_and_cache_examples(args, task, tokenizer, evaluate=False):
