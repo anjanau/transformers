@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
+import matplotlib.pyplot as plt
 
 from transformers.data.processors.utils import DataProcessor, InputExample
 
@@ -135,6 +136,10 @@ def set_seed(args):
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
+all_train_losses = []
+all_dev_losses = []
+all_train_acc = []
+all_dev_acc = []
 
 def train(args, train_dataset, model, tokenizer):
     """ Train the model """
@@ -311,103 +316,6 @@ def train(args, train_dataset, model, tokenizer):
 
     return global_step, tr_loss / global_step
 
-"""
-def eval_train_or_test(args, model, tokenizer, prefix="", eval=True, epoch=None):
-    eval_task_names = (args.task_name,)
-    eval_outputs_dirs = (args.output_dir,)
-    tord = "dev" if eval else "train"
-    results = {}
-    for eval_task, eval_output_dir in zip(eval_task_names, eval_outputs_dirs):
-        eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, evaluate=eval)
-
-        if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
-            os.makedirs(eval_output_dir)
-
-        args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
-        # Note that DistributedSampler samples randomly
-        eval_sampler = SequentialSampler(eval_dataset)
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
-
-        # multi-gpu eval
-        if args.n_gpu > 1:
-            model = torch.nn.DataParallel(model)
-
-        # Eval!
-        logger.info("***** Running evaluation {} *****".format(prefix))
-        logger.info("  Num examples = %d", len(eval_dataset))
-        logger.info("  Batch size = %d", args.eval_batch_size)
-        eval_loss = 0.0
-        nb_eval_steps = 0
-        preds = None
-        out_label_ids = None
-        for batch in tqdm(eval_dataloader, desc="Evaluating"):
-            model.eval()
-            batch = tuple(t.to(args.device) for t in batch)
-
-            with torch.no_grad():
-                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
-                if args.model_type != "distilbert":
-                    inputs["token_type_ids"] = (
-                        batch[2] if args.model_type in ["bert"] else None
-                    )  # XLM and DistilBERT don't use segment_ids
-                outputs = model(**inputs)
-                tmp_eval_loss, logits = outputs[:2]
-
-                eval_loss += tmp_eval_loss.mean().item()
-            nb_eval_steps += 1
-            if preds is None:
-                preds = logits.detach().cpu().numpy()
-                out_label_ids = inputs["labels"].detach().cpu().numpy()
-            else:
-                preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-                out_label_ids = np.append(out_label_ids, inputs["labels"].detach().cpu().numpy(), axis=0)
-
-        eval_loss = eval_loss / nb_eval_steps
-        print("eval loss:", eval_loss)
-        if args.output_mode == "classification":
-            preds = np.argmax(preds, axis=1)
-        else:
-            raise ValueError("No other `output_mode` for XNLI.")
-        result = compute_metrics(eval_task, preds, out_label_ids)
-        print(eval_dataset)
-        print("predictions:", preds)
-        print("output label ids:", out_label_ids)
-        results.update(result)
-
-        preds_labels = list(zip(preds, out_label_ids))
-
-        num_entailment_wrong, num_contradiction_wrong = 0, 0
-        for i in range((len(preds))):
-            if preds[i] != out_label_ids[i] and out_label_ids[i] == 1:
-                num_entailment_wrong += 1
-            elif preds[i] != out_label_ids[i] and out_label_ids[i] == 0:
-                num_contradiction_wrong += 1
-        logger.info("num entailment wrong:", num_entailment_wrong)
-        logger.info("num contradiction wrong:", num_contradiction_wrong)
-
-        output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
-        with open(output_eval_file, "w") as writer:
-            logger.info("***** {} results {} *****".format(tord, prefix))
-            for key in sorted(result.keys()):
-                logger.info("  %s = %s", key, str(result[key]))
-                writer.write("%s = %s\n" % (key, str(result[key])))
-        with open(output_eval_file, "w") as writer:
-            logger.info("***** {} results {} *****".format(tord, prefix))
-            logger.info("Loss=%s", str(eval_loss))
-            for key in sorted(result.keys()):
-                logger.info("  %s = %s", key, str(result[key]))
-                writer.write("%s = %s\n" % (key, str(result[key])))
-        if eval and epoch is None:
-            with open(os.path.join(eval_output_dir, "preds_and_labels.csv"), "wt") as out_file:
-                tsv_writer = csv.writer(out_file, delimiter='\t')
-                tsv_writer.writerows([["prediction", "label"]] + preds_labels)
-        elif eval and epoch is not None:
-            with open(os.path.join(eval_output_dir, "preds_and_labels_epoch_" + str(epoch) + ".csv"), "wt") as out_file:
-                tsv_writer = csv.writer(out_file, delimiter='\t')
-                tsv_writer.writerows([["prediction", "label"]] + preds_labels)
-
-    return results
-"""
 
 def eval_train_or_test(args, model, tokenizer, prefix="", eval=True, epoch=None):
     eval_task_names = (args.task_name,)
@@ -483,12 +391,22 @@ def eval_train_or_test(args, model, tokenizer, prefix="", eval=True, epoch=None)
 
         preds_labels = list(zip(preds, out_label_ids))
 
+        if epoch is not None:
+            if eval:
+                all_dev_losses.append(eval_loss)
+                for key in sorted(result.keys()):
+                    all_dev_acc.append(result[key])
+            else:
+                all_train_losses.append(eval_loss)
+                for key in sorted(result.keys()):
+                    all_train_acc.append(result[key])
+
         if epoch is None:
             output_eval_file = os.path.join(eval_output_dir, prefix, tord + "_eval_results" + ".txt")
         else:
             output_eval_file = os.path.join(eval_output_dir, prefix, tord + "_eval_results_epoch_" + str(epoch) + ".txt")
         with open(output_eval_file, "w") as writer:
-            logger.info("***** {} results {} *****".format(tord, prefix))
+            logger.info("***** {} results {} for epoch {} *****".format(tord, prefix, "n/a" if epoch is None else epoch))
             logger.info("Loss=%s", str(eval_loss))
             for key in sorted(result.keys()):
                 logger.info("  %s = %s", key, str(result[key]))
@@ -560,6 +478,32 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
 
     dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
     return dataset
+
+
+def plot_curves(args):
+    global all_dev_acc
+    global all_train_acc
+    global all_train_losses
+    global all_dev_losses
+    eval_output_dir = args.output_dir
+    output_eval_file_acc = os.path.join(eval_output_dir, "acc_curve")
+    output_eval_file_loss = os.path.join(eval_output_dir, "loss_curve")
+    print("all_dev_losses", all_dev_losses)
+    print("all_train_losses", all_train_losses)
+    print("all_dev_acc", all_dev_acc)
+    print("all_train_acc", all_train_acc)
+    plt.plot([i for i in range(1, len(all_dev_acc) + 1)], all_dev_acc, color='blue', label='dev')
+    plt.plot([i for i in range(1, len(all_train_acc) + 1)], all_train_acc, color='red', label='train')
+    plt.title("Accuracy per epoch")
+    plt.legend()
+    plt.savefig(output_eval_file_acc + ".png")
+    plt.close()
+    plt.plot([i for i in range(1, len(all_dev_losses) + 1)], all_dev_losses, color='blue', label='dev')
+    plt.plot([i for i in range(1, len(all_train_losses) + 1)], all_train_losses, color='red', label='train')
+    plt.legend()
+    plt.title("Loss per epoch")
+    plt.savefig(output_eval_file_loss + ".png")
+    plt.close()
 
 
 def main():
@@ -836,6 +780,7 @@ def main():
             res2 = eval_train_or_test(args, model, tokenizer, prefix=prefix, eval=False)
             result = dict((k + "_{}".format(global_step), v) for k, v in result.items())
             results.update(result)
+            plot_curves(args)
 
     return results
 
