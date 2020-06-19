@@ -414,6 +414,7 @@ def eval_train_or_test(args, model, tokenizer, prefix="", eval=True, epoch=None)
             for key in sorted(result.keys()):
                 logger.info("  %s = %s", key, str(result[key]))
                 writer.write("%s = %s\n" % (key, str(result[key])))
+                writer.write("%s = %s\n" % ("loss", str(eval_loss)))
         if eval and epoch is None:
             with open(os.path.join(eval_output_dir, "preds_and_labels_split_"+str(args.split_num)+".csv"), "wt") as out_file:
                 tsv_writer = csv.writer(out_file, delimiter='\t')
