@@ -103,7 +103,7 @@ class NliProcessor(DataProcessor):
 
     def get_labels(self):
         """See base class."""
-        return ["contradiction", "entailment"]
+        return ["contradiction", "entailed"]
 
 
 processors = {
