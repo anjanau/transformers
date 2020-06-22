@@ -487,8 +487,8 @@ def plot_curves(args):
     global all_train_losses
     global all_dev_losses
     eval_output_dir = args.output_dir
-    output_eval_file_acc = os.path.join(eval_output_dir, "split_" + str(split_num) + "_acc_curve")
-    output_eval_file_loss = os.path.join(eval_output_dir, "split_" + str(split_num) + "_loss_curve")
+    output_eval_file_acc = os.path.join(eval_output_dir, "acc_curve")
+    output_eval_file_loss = os.path.join(eval_output_dir, "loss_curve")
     print("all_dev_losses", all_dev_losses)
     print("all_train_losses", all_train_losses)
     print("all_dev_acc", all_dev_acc)
