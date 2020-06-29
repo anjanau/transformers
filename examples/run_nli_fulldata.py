@@ -88,12 +88,14 @@ class NliProcessor(DataProcessor):
         lines = self._read_tsv(os.path.join(data_dir, "dev.tsv"))
         examples = []
         for (i, line) in enumerate(lines):
-            if i == 0:
-                continue
+            #if i == 0:
+            #    continue
             guid = "%s-%s" % ("test", i)
             text_a = line[0]
             text_b = line[1]
             label = line[2].strip()
+            if label == "Label":
+                continue
             # print("dev label:", label)
             # label = line[1]
             assert isinstance(text_a, str) and isinstance(text_b, str) and isinstance(label, str)
